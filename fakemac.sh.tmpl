@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 if test $# -lt 2
 then
@@ -8,4 +8,4 @@ fi
 export MAC_ADDRESS="$1"
 shift
 
-LD_PRELOAD=/usr/lib/libfakemac.so exec "$@"
+LD_PRELOAD=<PREFIX>/lib/libfakemac.so exec "$@"
