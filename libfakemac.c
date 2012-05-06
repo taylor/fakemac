@@ -27,10 +27,15 @@
 #define	_GNU_SOURCE
 
 #include <sys/ioctl.h>
+#include <dlfcn.h>
+#define _FCNTL_H
+//#include <bits/fcntl.h>
+#include <fcntl.h>
+#include <dlfcn.h>
 
 #include <net/if.h>
 
-#include <dlfcn.h>
+#include <unistd.h>
 #include <stdio.h>
 #include <stdarg.h>
 #include <stdlib.h>
@@ -38,6 +43,8 @@
 
 static unsigned char mac[6];
 static int (*orig_ioctl)(int, unsigned long, void *);
+
+int (*orig_execve)(const char *filename, char *const argv[],char *const envp[]); 
 
 static int
 hex_to_bin(char ch)
@@ -124,4 +131,32 @@ ioctl(int fd, unsigned long request, ...)
 #error Operating system not supported
 #endif
 	return (0);
+}
+
+int
+execve(const char *filename, char *const argv[],char *const envp[])
+{
+	orig_execve = (int (*)(const char *filename, char *const argv[],char *const envp[]))  dlsym(RTLD_NEXT, "execve");
+
+  char *ldprenv;
+  char *macenv;
+  size_t ldprenv_size;
+  size_t macenv_size;
+  char *ldpr_str = getenv("LD_PRELOAD");
+  char *mac_str  = getenv("MAC_ADDRESS");
+
+  if (ldpr_str == NULL || mac_str == NULL)
+    return orig_execve(filename,argv,envp);
+
+  ldprenv_size = strlen(ldpr_str)+12;
+  macenv_size = strlen(mac_str)+13;
+
+  ldprenv = malloc(ldprenv_size*sizeof(char) + 1);
+  macenv = malloc(macenv_size*sizeof(char) + 1);
+
+  snprintf(ldprenv, ldprenv_size, "LD_PRELOAD=%s", ldpr_str);
+  snprintf(macenv, macenv_size, "MAC_ADDRESS=%s", mac_str);
+
+  char *const newenvp[] = { macenv, ldprenv, *envp, NULL }; 
+  return orig_execve(filename,argv,newenvp);
 }
